@@ -1,0 +1,615 @@
+
+<!DOCTYPE html>
+<!--[if IEMobile 7 ]><html class="no-js iem7"><![endif]-->
+<!--[if lt IE 9]><html class="no-js lte-ie8"><![endif]-->
+<!--[if (gt IE 8)|(gt IEMobile 7)|!(IEMobile)|!(IE)]><!--><html class="no-js" lang="en"><!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <title>Serving Django powered websites with Cherokee and uWSGI on Debian - baechtold.me</title>
+  <meta name="author" content="Martin Bächtold">
+
+  
+  <meta name="description" content="There are many ways to serve your Django powered websites i.e. with Apache/mod_wsgi or Nginx/Gunicorn. Another setup includes Cherokee and uWSGI. &hellip;">
+  
+
+  <!-- http://t.co/dKP3o1e -->
+  <meta name="HandheldFriendly" content="True">
+  <meta name="MobileOptimized" content="320">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  
+  <link rel="canonical" href="http://baechtold.me/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian">
+  <link href="/favicon.png" rel="icon">
+  <link href="/stylesheets/screen.css" media="screen, projection" rel="stylesheet" type="text/css">
+  <script src="/javascripts/modernizr-2.0.js"></script>
+  <script src="/javascripts/ender.js"></script>
+  <script src="/javascripts/octopress.js" type="text/javascript"></script>
+  <link href="/atom.xml" rel="alternate" title="baechtold.me" type="application/atom+xml">
+  <!--Fonts from Google"s Web font directory at http://google.com/webfonts -->
+<link href="http://fonts.googleapis.com/css?family=PT+Serif:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+<link href="http://fonts.googleapis.com/css?family=PT+Sans:regular,italic,bold,bolditalic" rel="stylesheet" type="text/css">
+
+  
+  <script type="text/javascript">
+    var _gaq = _gaq || [];
+    _gaq.push(['_setAccount', 'UA-4060583-7']);
+    _gaq.push(['_trackPageview']);
+
+    (function() {
+      var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+      ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+    })();
+  </script>
+
+
+</head>
+
+<body   >
+  <header role="banner"><hgroup>
+  <h1><a href="/">baechtold.me</a></h1>
+  
+    <h2>Just another solution log</h2>
+  
+</hgroup>
+
+</header>
+  <nav role="navigation"><ul class="subscription" data-subscription="rss">
+  <li><a href="/atom.xml" rel="subscribe-rss" title="subscribe via RSS">RSS</a></li>
+  
+</ul>
+  
+<form action="http://google.com/search" method="get">
+  <fieldset role="search">
+    <input type="hidden" name="q" value="site:baechtold.me" />
+    <input class="search" type="text" name="q" results="0" placeholder="Search"/>
+  </fieldset>
+</form>
+  
+<ul class="main-navigation">
+  <li><a href="/">Blog</a></li>
+  <li><a href="/blog/archives">Archives</a></li>
+  <li><a href="/about">About</a></li>
+</ul>
+
+</nav>
+  <div id="main">
+    <div id="content">
+      <div>
+<article class="hentry" role="article">
+  
+  <header>
+    
+      <h1 class="entry-title">Serving Django powered websites with Cherokee and uWSGI on Debian</h1>
+    
+    
+      <p class="meta">
+        
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-02-23T13:42:00+01:00" pubdate data-updated="true">Feb 23<span>rd</span>, 2012</time>
+        
+      </p>
+    
+  </header>
+
+
+<div class="entry-content"><p>There are many ways to serve your Django powered websites i.e. with Apache/mod_wsgi or Nginx/Gunicorn. Another setup includes Cherokee and uWSGI. What follows are the notes I took during the setup of my Cherokee/uWSGI stack.</p>
+
+<!-- more -->
+
+
+<p>These are the main ingredients for this setup:</p>
+
+<ul>
+<li>Debian 6 (Squeeze)</li>
+<li><a href="http://www.cherokee-project.com/">Cherokee</a> (1.0.8)</li>
+<li><a href="http://projects.unbit.it/uwsgi/">uWSGI</a> (1.0.4)</li>
+<li>Some helpful tools for python: <a href="http://www.virtualenv.org/">virtualenv</a>, <a href="http://www.doughellmann.com/projects/virtualenvwrapper/">virtualenvwrapper</a> and <a href="http://www.pip-installer.org/">pip</a></li>
+</ul>
+
+
+<h2>Preliminaries</h2>
+
+<p>I created an unprivileged user called <em>web</em> on my server. All the virtualenvs and Django sites will be stored in this user&#8217;s home directory.</p>
+
+<h2>Installing Cherokee web server</h2>
+
+<p><img class="right" src="/images/cherokee/v1_0_8/cherokee_test_page.png" width="190" title="Cherokee Test Page" ></p>
+
+<p>Installing the Cherokee web server is easy. Basically you only need one package — the server itself: <code>$ apt-get install cherokee</code></p>
+
+<p>Additionally you may choose to install some of its <a href="http://packages.debian.org/search?keywords=libcherokee-mod&amp;searchon=names&amp;suite=stable&amp;section=all">plugins</a> too.</p>
+
+<p>That&#8217;s it. Enter the public IP or FQDN of your server in a browser and you should see Cherokee&#8217;s default page.</p>
+
+<h2>Installing uWSGI</h2>
+
+<p>I had to build <em>uWSGI</em> from source since there is no packaged version of <em>uWSGI</em> for Debian 6 (Squeeze) available. Note that the following commands have to be run as root (or with sudo).</p>
+
+<p>Install some required software packages: <code>$ apt-get install build-essential python-dev libxml2-dev</code></p>
+
+<p>Now fetch and compile <em>uWSGI</em>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ cd /tmp
+</span><span class='line'>$ wget http://projects.unbit.it/downloads/uwsgi-latest.tar.gz
+</span><span class='line'>$ tar xvf uwsgi-latest.tar.gz
+</span><span class='line'>$ cd uwsgi-*/
+</span><span class='line'>$ make
+</span><span class='line'>$ mv uwsgi /usr/local/bin</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Change the owner of <em>uWSGI</em> to <em>www-data</em>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ chown -R www-data:www-data /usr/local/bin/uwsgi
+</span><span class='line'>$ touch /var/log/uwsgi.log
+</span><span class='line'>$ chown www-data /var/log/uwsgi.log</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>Virtual environments for Python</h2>
+
+<p>Of course we&#8217;re going to take advantage of <em>virtualenv</em> and <em>pip</em>. Feel free to also install <em>virtualenvwrapper</em> to make switching between virtual environments a lot easier. Note that the following commands have to be run as root (or with sudo).</p>
+
+<p>Install <em>distribute</em>:
+<code>$ curl http://python-distribute.org/distribute_setup.py | python</code></p>
+
+<p>Install <em>pip</em> into python&#8217;s global site-packages:
+<code>$ easy_install pip</code></p>
+
+<p>Install <em>virtualenv</em> into python&#8217;s global site-packages:
+<code>$ pip install virtualenv</code></p>
+
+<p>Optional: Install <em>virtualenvwrapper</em> into python&#8217;s global site-packages:
+<code>$ pip install virtualenvwrapper</code></p>
+
+<h2>Where the Django projects live</h2>
+
+<p>All my Django projects are going to be stored in an (unprivileged) user&#8217;s home directory (the user is called <em>web</em>). So log in as the user <em>web</em> and create the directories <code>~/sites</code>, <code>~/virtualenvs</code> and <code>~/.pip</code>. Note that the following settings and commands have to be done as the (unprivileged) user <em>web</em> and not as <em>root</em>.</p>
+
+<p>If you have installed <em>virtuelnvwrapper</em> you should add the following lines to <code>~/.bashrc</code> and reload it with <code>$ source ~/.bashrc</code>.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>export WORKON_HOME=$HOME/virtualenvs
+</span><span class='line'>export PROJECT_HOME=$HOME/sites
+</span><span class='line'>source /usr/local/bin/virtualenvwrapper.sh</span></code></pre></td></tr></table></div></figure>
+
+
+<p>By adding the following lines to <code>~/.pip/pip.conf</code> you&#8217;ll tell <em>pip</em> to locally cache the downloaded python packages. Using the PyPI mirrors is a good idea too in case the primary PyPI server is unreachable.</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+<span class='line-number'>13</span>
+<span class='line-number'>14</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>[global]
+</span><span class='line'>timeout = 60
+</span><span class='line'> 
+</span><span class='line'>[freeze]
+</span><span class='line'>timeout = 10
+</span><span class='line'> 
+</span><span class='line'>[install]
+</span><span class='line'>#ignore-installed = true
+</span><span class='line'>#no-dependencies = yes
+</span><span class='line'>download-cache=~/.pip/cache/
+</span><span class='line'>use-mirrors = true
+</span><span class='line'>mirrors =
+</span><span class='line'>    http://d.pypi.python.org
+</span><span class='line'>    http://b.pypi.python.org</span></code></pre></td></tr></table></div></figure>
+
+
+<p>Create a virtualenv for the Django project you&#8217;re going to deploy (replace &#8220;django.example.com&#8221; with a meaningful name of your project): <code>$ mkvirtualenv --no-site-packages django.example.com</code>. Please note that <code>mkvirtualenv</code> is a command from <em>virtualenvwarpper</em>. Use <code>virtualenv</code> if have not installed <em>virtualenvwrapper</em>.</p>
+
+<p>Next you would deploy your project into <code>~/sites/django.example.com</code> and install the required python packages with <em>pip</em>.</p>
+
+<p>If you need to create a database, now is the time to run the management commands like <code>syncdb</code> and <code>migrate</code> (yes, you should use <a href="http://south.aeracode.org/">South</a>). Execute any other task of your deployment process, i.e. the <code>collectstatic</code> management command.</p>
+
+<h2>uWSGI config</h2>
+
+<p>In order to get <em>uWSGI</em> to execute the Django app, two additional files are required: <em>uwsgi.conf</em> and <em>django_wsgi.py</em>.</p>
+
+<p>The former is an xml file where you define one or more paths to be added to the PYTHONPATH environment variable and the mount point for your application. The latter is a python module where you define your WSGI configuration needed by <em>uWSGI</em>.</p>
+
+<p>It&#8217;s nice to have a <em>touch</em> file configured in <code>&lt;touch-reload&gt;</code> in order to easily restart the application.</p>
+
+<figure class='code'><figcaption><span>uwsgi.conf  </span></figcaption>
+ <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class='xml'><span class='line'><span class="nt">&lt;uwsgi&gt;</span>
+</span><span class='line'>  <span class="nt">&lt;pythonpath&gt;</span>/home/web/sites/django.example.com<span class="nt">&lt;/pythonpath&gt;</span>
+</span><span class='line'>  <span class="nt">&lt;pythonpath&gt;</span>/home/web/sites/django.example.com/uwsgi<span class="nt">&lt;/pythonpath&gt;</span>
+</span><span class='line'>  <span class="nt">&lt;pythonpath&gt;</span>/home/web/virtualenvs/django.example.com/lib/python2.6/site-packages<span class="nt">&lt;/pythonpath&gt;</span>
+</span><span class='line'>  <span class="nt">&lt;touch-reload&gt;</span>/home/web/sites/django.example.com/uwsgi/restart.txt<span class="nt">&lt;/touch-reload&gt;</span>
+</span><span class='line'>  <span class="nt">&lt;app</span> <span class="na">mountpoint=</span><span class="s">&quot;/&quot;</span><span class="nt">&gt;</span>
+</span><span class='line'>    <span class="nt">&lt;script&gt;</span>django_wsgi<span class="nt">&lt;/script&gt;</span>
+</span><span class='line'>  <span class="nt">&lt;/app&gt;</span>
+</span><span class='line'><span class="nt">&lt;/uwsgi&gt;</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+
+
+<figure class='code'><figcaption><span>django_wsgi.py  </span></figcaption>
+ <div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+</pre></td><td class='code'><pre><code class='python'><span class='line'><span class="kn">import</span> <span class="nn">os</span>
+</span><span class='line'><span class="kn">import</span> <span class="nn">django.core.handlers.wsgi</span>
+</span><span class='line'>
+</span><span class='line'><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s">&#39;DJANGO_SETTINGS_MODULE&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s">&#39;demo_project.settings&#39;</span>
+</span><span class='line'><span class="n">application</span> <span class="o">=</span> <span class="n">django</span><span class="o">.</span><span class="n">core</span><span class="o">.</span><span class="n">handlers</span><span class="o">.</span><span class="n">wsgi</span><span class="o">.</span><span class="n">WSGIHandler</span><span class="p">()</span>
+</span></code></pre></td></tr></table></div></figure>
+
+
+<p>The directory structure now should look something like this:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/home/web/sites/django.example.com/
+</span><span class='line'>|-- demo_project
+</span><span class='line'>|   |-- __init__.py
+</span><span class='line'>|   |-- manage.py
+</span><span class='line'>|   |-- settings.py
+</span><span class='line'>|   `-- urls.py
+</span><span class='line'>`-- uwsgi
+</span><span class='line'>    |-- django_wsgi.py
+</span><span class='line'>    `-- uwsgi.conf</span></code></pre></td></tr></table></div></figure>
+
+
+<h2>Inside Cherokee&#8217;s admin interface</h2>
+
+<p>Now we need to tell Cherokee to handle the incoming requests and delegate them to <em>uWSGI</em>.
+Launch Cherokee&#8217;s admin interface by running <code>$ cherokee-admin</code> as a superuser (or any other user having write access to <code>/etc/cherokee/cherokee.conf</code>). The output should look similar to the following lines:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>$ cherokee-admin
+</span><span class='line'>
+</span><span class='line'>Login:
+</span><span class='line'>  User:              admin
+</span><span class='line'>  One-time Password: abcdefghijklmnopqr
+</span><span class='line'>
+</span><span class='line'>Web Interface:
+</span><span class='line'>  URL:               http://127.0.0.1:9090/
+</span><span class='line'>
+</span><span class='line'>Cherokee Web Server 1.0.8 (Nov 28 2011): Listening on port 127.0.0.1:9090, TLS
+</span><span class='line'>disabled, IPv6 enabled, using epoll, 4096 fds system limit, max. 2041
+</span><span class='line'>connections, caching I/O, single thread</span></code></pre></td></tr></table></div></figure>
+
+
+<p>As you can see, the admin interface is only listening on localhost and port 9090. So you need to open an ssh tunnel on your local machine: <code>ssh -L 9090:localhost:9090 user@your_server</code>. Then open <code>http://localhost:9090</code> in a browser on your local machine. Welcome to Cherokees&#8217;s admin interface:</p>
+
+<p><img src="/images/cherokee/v1_0_8/admin/cherokee_admin_welcome.png" title="'Cherokee Admin'" ></p>
+
+<h4>Create a new vServer for your Django project</h4>
+
+<ol>
+<li>Choose &#8220;vServers&#8221; from the top menu</li>
+<li>Click the button labelled &#8220;New&#8221; in the upper left corner</li>
+<li>Choose &#8220;Platforms&#8221;, then &#8220;uWSGI&#8221; from the popup</li>
+<li>Click &#8220;Add&#8221; in the popup to launch the wizard</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/cherokee_admin_vserver_new.png" title="'Cherokee Admin'" ></p>
+
+<p>Click &#8220;Next&#8221; in the wizard.</p>
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/cherokee_admin_vserver_uwsgi_wizard.png" title="'Cherokee Admin'" ></p>
+
+<ol>
+<li>Enter the path to the <em>uWSGI</em> xml config file, i.e. <code>/home/web/sites/django.example.com/uwsgi/uwsgi.conf</code></li>
+<li>Click &#8220;Next&#8221;</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/cherokee_admin_vserver_uwsgi_wizard_config.png" title="'Cherokee Admin'" ></p>
+
+<ol>
+<li>Enter the host name of the website, i.e. &#8220;django.example.com&#8221; (you can add more host names once the vServer is created)</li>
+<li>Enter the path to the project root of your Django project, i.e. <code>/home/web/sites/django.example.com/demo_project</code></li>
+<li>Click &#8220;Create&#8221;</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/cherokee_admin_vserver_uwsgi_wizard_details.png" title="'Cherokee Admin'" ></p>
+
+<p>Now the new <em>vServer</em> is created and listed on the &#8220;vServers&#8221; page.</p>
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/cherokee_admin_vserver_uwsgi_wizard_finished.png" title="'Cherokee Admin'" ></p>
+
+<h4>Adjust the source</h4>
+
+<p>Choose &#8220;Sources&#8221; from the top menu. You should see a new source added by the wizard.</p>
+
+<p><img src="/images/cherokee/v1_0_8/admin/sources/cherokee_admin_uwsgi_source.png" title="'Cherokee Admin'" ></p>
+
+<ol>
+<li>You may want to change the source&#8217;s <em>Nick</em> to something more related to your Django project, i.e. django.example.com (this is simply the name/label of the source, you can change it as you please)</li>
+<li>Adjust the value of the field <em>Interpreter</em>:
+
+<ul>
+<li>The <em>interpreter</em> created by the wizard needs to point to the virtualenv, so change the <em>-H</em> flag from <code>/home/web/sites/django.example.com</code> to <code>/home/web/virtualenvs/django.example.com</code></li>
+<li>My <em>interpreter</em> value now looks like this: <code>/usr/local/bin/uwsgi -s 127.0.0.1:52499 -t 10 -M -p 1 -C  -x /home/web/sites/django.example.com/uwsgi/uwsgi.conf -H /home/web/virtualenvs/django.example.com</code></li>
+</ul>
+</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/sources/cherokee_admin_uwsgi_source_changed.png" title="'Cherokee Admin'" ></p>
+
+<h4>Serving static files</h4>
+
+<p>As a last step we need to take care of the static files like <code>MEDIA_ROOT</code> and <code>STATIC_ROOT</code> from your Django settings. In this example the <code>MEDIA_ROOT</code> is inside the <code>PROJECT_ROOT</code> and <code>STATIC_ROOT</code> is inside <code>SITE_ROOT</code>:</p>
+
+<figure class='code'><div class="highlight"><table><tr><td class="gutter"><pre class="line-numbers"><span class='line-number'>1</span>
+<span class='line-number'>2</span>
+<span class='line-number'>3</span>
+<span class='line-number'>4</span>
+<span class='line-number'>5</span>
+<span class='line-number'>6</span>
+<span class='line-number'>7</span>
+<span class='line-number'>8</span>
+<span class='line-number'>9</span>
+<span class='line-number'>10</span>
+<span class='line-number'>11</span>
+<span class='line-number'>12</span>
+</pre></td><td class='code'><pre><code class=''><span class='line'>/home/web/sites/django.example.com
+</span><span class='line'>|-- demo_project
+</span><span class='line'>|   |-- __init__.py
+</span><span class='line'>|   |-- manage.py
+</span><span class='line'>|   |-- media
+</span><span class='line'>|   |-- settings.py
+</span><span class='line'>|   `-- urls.py
+</span><span class='line'>|-- static
+</span><span class='line'>`-- uwsgi
+</span><span class='line'>    |-- django_wsgi.py
+</span><span class='line'>    |-- restart.txt
+</span><span class='line'>    `-- uwsgi.conf</span></code></pre></td></tr></table></div></figure>
+
+
+<p>So let&#8217;s add a <em>static handler</em> for <code>MEDIA_ROOT</code>:</p>
+
+<ol>
+<li>Choose &#8220;vServers&#8221; from the top menu</li>
+<li>Select the vServer for which you want to add a static handler</li>
+<li>Switch to the &#8220;Behavior&#8221; tab</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/rules/cherokee_admin_vserver_behavior.png" title="'Cherokee Admin'" ></p>
+
+<p>Click the button called &#8220;Rule Management&#8221; and you will see all the rules for the vServer.</p>
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/rules/cherokee_admin_vserver_behavior_rules.png" title="'Cherokee Admin'" ></p>
+
+<ol>
+<li>Click the &#8220;New&#8221; button in the upper left corner</li>
+<li>Choose &#8220;Manual&#8221; and the &#8220;Directory&#8221; rule type from the popup</li>
+<li>Enter the directory name containing the static files (this is relative to the document root of the vServer)</li>
+<li>Click &#8220;Add&#8221;</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/rules/static_handler/cherokee_admin_vserver_behavior_rule_new.png" title="'Cherokee Admin'" ></p>
+
+<ol>
+<li>Switch to the &#8220;Handler&#8221; tab</li>
+<li>Set the handler to &#8220;Static Content&#8221;</li>
+</ol>
+
+
+<p><img src="/images/cherokee/v1_0_8/admin/vservers/rules/static_handler/cherokee_admin_vserver_behavior_handler_static.png" title="'Cherokee Admin'" ></p>
+
+<p>Repeat these steps to add a handler for <code>STATIC_ROOT</code>. You may enter an absolute &#8220;Document Root&#8221; i.e. <code>/home/web/sites/django.example.com/static</code> since the static folder is one level above the vServer&#8217;s document root.</p>
+
+<h4>Restart</h4>
+
+<p>Hit the &#8220;Save&#8221; button in the upper right corner and perform a &#8220;graceful restart&#8221;. Your website should now be up and running.</p>
+
+<p>Feel free to poke around the admin interface — there&#8217;s a lot of stuff you can do in there.
+Don&#8217;t forget to stop the admin interface and close the tunnel once you&#8217;re done.</p>
+</div>
+
+
+  <footer>
+    <p class="meta">
+      
+  
+
+<span class="byline author vcard">Posted by <span class="fn">Martin Bächtold</span></span>
+
+      
+
+
+
+
+
+
+
+
+  
+
+
+<time datetime="2012-02-23T13:42:00+01:00" pubdate data-updated="true">Feb 23<span>rd</span>, 2012</time>
+      
+
+<span class="categories">
+  
+    <a class='category' href='/blog/categories/cherokee/'>cherokee</a>, <a class='category' href='/blog/categories/debian/'>debian</a>, <a class='category' href='/blog/categories/django/'>django</a>, <a class='category' href='/blog/categories/uwsgi/'>uwsgi</a>
+  
+</span>
+
+
+    </p>
+    
+      <div class="sharing">
+  
+  <a href="http://twitter.com/share" class="twitter-share-button" data-url="http://baechtold.me/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian/" data-via="" data-counturl="http://baechtold.me/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian/" >Tweet</a>
+  
+  
+  <div class="g-plusone" data-size="medium"></div>
+  
+  
+    <div class="fb-like" data-send="true" data-width="450" data-show-faces="false"></div>
+  
+</div>
+
+    
+    <p class="meta">
+      
+        <a class="basic-alignment left" href="/blog/2012/02/18/hello-world/" title="Previous Post: Hello World">&laquo; Hello World</a>
+      
+      
+    </p>
+  </footer>
+</article>
+
+  <section>
+    <h1>Comments</h1>
+    <div id="disqus_thread" aria-live="polite"><noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+</div>
+  </section>
+
+</div>
+
+<aside class="sidebar">
+  
+    <section>
+  <h1>Recent Posts</h1>
+  <ul id="recent_posts">
+    
+      <li class="post">
+        <a href="/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian/">Serving Django powered websites with Cherokee and uWSGI on Debian</a>
+      </li>
+    
+      <li class="post">
+        <a href="/blog/2012/02/18/hello-world/">Hello World</a>
+      </li>
+    
+  </ul>
+</section>
+
+  
+</aside>
+
+
+    </div>
+  </div>
+  <footer role="contentinfo"><p>
+  Copyright &copy; 2012 - Martin Bächtold -
+  <span class="credit">Powered by <a href="http://octopress.org">Octopress</a></span>
+</p>
+
+</footer>
+  
+
+<script type="text/javascript">
+      var disqus_shortname = 'baechtoldme';
+      
+        
+        // var disqus_developer = 1;
+        var disqus_identifier = 'http://baechtold.me/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian/';
+        var disqus_url = 'http://baechtold.me/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian/';
+        var disqus_script = 'embed.js';
+      
+    (function () {
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = 'http://' + disqus_shortname + '.disqus.com/' + disqus_script;
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    }());
+</script>
+
+
+
+<div id="fb-root"></div>
+<script>(function(d, s, id) {
+  var js, fjs = d.getElementsByTagName(s)[0];
+  if (d.getElementById(id)) {return;}
+  js = d.createElement(s); js.id = id;
+  js.src = "//connect.facebook.net/en_US/all.js#appId=212934732101925&xfbml=1";
+  fjs.parentNode.insertBefore(js, fjs);
+}(document, 'script', 'facebook-jssdk'));</script>
+
+
+
+  <script type="text/javascript">
+    (function() {
+      var script = document.createElement('script'); script.type = 'text/javascript'; script.async = true;
+      script.src = 'https://apis.google.com/js/plusone.js';
+      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(script, s);
+    })();
+  </script>
+
+
+
+  <script type="text/javascript">
+    (function(){
+      var twitterWidgets = document.createElement('script');
+      twitterWidgets.type = 'text/javascript';
+      twitterWidgets.async = true;
+      twitterWidgets.src = 'http://platform.twitter.com/widgets.js';
+      document.getElementsByTagName('head')[0].appendChild(twitterWidgets);
+    })();
+  </script>
+
+
+
+
+
+</body>
+</html>

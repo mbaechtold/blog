@@ -1,0 +1,25 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>
+    <url>
+        <loc>http://baechtold.me/blog/2012/02/18/hello-world/</loc>
+        <lastmod>2012-02-18T16:20:30+01:00</lastmod>
+    </url>
+    <url>
+        <loc>
+            http://baechtold.me/blog/2012/02/23/serving-django-powered-website-with-cherokee-uwsgi-debian/
+        </loc>
+        <lastmod>2012-02-23T20:14:34+01:00</lastmod>
+    </url>
+    <url>
+        <loc>http://baechtold.me/about/</loc>
+        <lastmod>2012-02-24T10:43:13+01:00</lastmod>
+    </url>
+    <url>
+        <loc>http://baechtold.me/blog/archives/</loc>
+        <lastmod>2012-02-23T20:14:34+01:00</lastmod>
+    </url>
+    <url>
+        <loc>http://baechtold.me/</loc>
+        <lastmod>2012-02-23T20:14:34+01:00</lastmod>
+    </url>
+</urlset>
