@@ -1,0 +1,33 @@
+Back To Square One
+==================
+
+.. highlight:: bash
+
+More than one year ago I thought it would be a great idea to start some kind of technical blog
+based on *Octopress* but I never managed to write more than one article.
+
+It only was last weekend I stumbled upon *Tinkerer*, a static blog generator
+based on *Sphinx*, the Python documentation generation system. I was
+hooked immediately and within 5 minutes I had setup a project, installed *Tinkerer* and created my first
+blog post::
+
+    mkproject --my-tinkerer-blog  # Powered by virtualenvwrapper
+    pip install tinkerer
+    tinker --setup
+    tinker --post "Hello World"
+
+The last command created a file where I could put the content of the post in *reStructedText* format.
+A final command was necessary in order to build the static HTML::
+
+    tinker --build
+
+All that was left was copying the generated HTML to my Github pages repository and push it to Github.
+
+Now that I switched to a system I know more than the last one I even might
+write a bit more. We'll see.
+
+
+.. author:: default
+.. categories:: none
+.. tags:: blogging, python, sphinx
+.. comments::

@@ -1,0 +1,10 @@
+Sitemap
+=======
+
+.. toctree::
+   :maxdepth: 1
+
+   2013/07/05/back_to_square_one
+   2013/07/02/hello_world
+   pages/about
+
