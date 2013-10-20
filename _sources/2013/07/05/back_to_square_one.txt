@@ -11,7 +11,7 @@ based on *Sphinx*, the Python documentation generation system. I was
 hooked immediately and within 5 minutes I had setup a project, installed *Tinkerer* and created my first
 blog post::
 
-    mkproject --my-tinkerer-blog  # Powered by virtualenvwrapper
+    mkproject my-tinkerer-blog  # Powered by virtualenvwrapper
     pip install tinkerer
     tinker --setup
     tinker --post "Hello World"
